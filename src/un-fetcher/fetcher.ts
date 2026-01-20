@@ -12,6 +12,79 @@ export interface UNDocument {
   format: 'doc' | 'pdf'
 }
 
+export interface UNDocumentMetadata {
+  symbol: string
+  title: string
+  date: string | null
+  year: number | null
+}
+
+/**
+ * Fetch document metadata from UN Digital Library
+ * Returns title, date, and year for the given symbol
+ */
+export async function fetchDocumentMetadata(symbol: string): Promise<UNDocumentMetadata> {
+  const encodedSymbol = encodeURIComponent(symbol)
+  const url = `https://digitallibrary.un.org/search?ln=en&p=${encodedSymbol}&f=&rm=&sf=&so=d&rg=50&c=Resource+Type&c=UN+Bodies&c=&of=xm&fti=0&fti=0`
+
+  // Use curl user-agent to bypass AWS WAF challenge
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'curl/8.7.1',
+      'Accept': '*/*',
+    },
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to fetch metadata for ${symbol}`)
+  }
+
+  const xml = await response.text()
+  
+  // Split into records using regex to handle whitespace
+  const recordMatches = xml.match(/<record>[\s\S]*?<\/record>/g)
+  if (!recordMatches) {
+    return { symbol, title: symbol, date: null, year: null }
+  }
+  
+  for (const record of recordMatches) {
+    // Extract symbol from tag 191$a - look for the subfield within the datafield
+    const tag191Match = record.match(/<datafield tag="191"[^>]*>([\s\S]*?)<\/datafield>/)
+    if (!tag191Match) continue
+    
+    const symbolSubfieldMatch = tag191Match[1].match(/<subfield code="a">([^<]+)<\/subfield>/)
+    if (!symbolSubfieldMatch || symbolSubfieldMatch[1] !== symbol) {
+      continue // Not an exact match, skip
+    }
+
+    // Extract title from tag 245$a
+    const tag245Match = record.match(/<datafield tag="245"[^>]*>([\s\S]*?)<\/datafield>/)
+    let title = symbol
+    if (tag245Match) {
+      const titleSubfieldMatch = tag245Match[1].match(/<subfield code="a">([^<]+)<\/subfield>/)
+      if (titleSubfieldMatch) {
+        title = titleSubfieldMatch[1].replace(/ :$/, '').trim()
+      }
+    }
+
+    // Extract date from tag 269$a (format: YYYY-MM-DD)
+    const tag269Match = record.match(/<datafield tag="269"[^>]*>([\s\S]*?)<\/datafield>/)
+    let date: string | null = null
+    let year: number | null = null
+    if (tag269Match) {
+      const dateSubfieldMatch = tag269Match[1].match(/<subfield code="a">(\d{4}-\d{2}-\d{2})<\/subfield>/)
+      if (dateSubfieldMatch) {
+        date = dateSubfieldMatch[1]
+        year = parseInt(date.substring(0, 4))
+      }
+    }
+
+    return { symbol, title, date, year }
+  }
+
+  // No exact match found, return with null values
+  return { symbol, title: symbol, date: null, year: null }
+}
+
 /**
  * Fetch and parse a UN document by its symbol
  * Tries DOC format first, falls back to PDF

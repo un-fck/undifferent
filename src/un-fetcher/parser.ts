@@ -54,8 +54,13 @@ export function parseUNSymbol(symbol: string): ParsedSymbol {
 }
 
 /**
- * Extract year from UN document symbol
- * Session numbers map to years: session 77 = 2022 (1945 + 77)
+ * Extract year from UN document symbol using session number calculation
+ * 
+ * NOTE: This is a heuristic that only works reliably for GA resolutions:
+ *   - GA session N → year 1945 + N (e.g., session 77 = 2022)
+ *   - Does NOT work for HRC resolutions (multiple sessions per year)
+ * 
+ * For accurate years, use fetchDocumentMetadata() instead.
  */
 export function extractYear(symbol: string): number | null {
   const parsed = parseUNSymbol(symbol)

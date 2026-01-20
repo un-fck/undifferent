@@ -59,15 +59,18 @@ import type { DiffResult } from 'undifferent/core'
 The un-fetcher module provides utilities for fetching UN documents (server-side only):
 
 ```typescript
-import { fetchUNDocument, extractYear } from 'undifferent/un-fetcher'
+import { fetchUNDocument, fetchDocumentMetadata } from 'undifferent/un-fetcher'
 
 // Fetch a UN document by symbol
 const doc = await fetchUNDocument('A/RES/77/16')
 console.log(doc.lines)    // Array of text lines
 console.log(doc.format)   // 'doc' or 'pdf'
 
-// Extract year from session number
-const year = extractYear('A/RES/77/16')  // 2022 (1945 + 77)
+// Fetch document metadata (title, date, year) from UN Digital Library
+const meta = await fetchDocumentMetadata('A/HRC/RES/50/13')
+console.log(meta.title)   // "Access to medicines, vaccines..."
+console.log(meta.date)    // "2022-07-14"
+console.log(meta.year)    // 2022
 ```
 
 ## Styling
@@ -102,8 +105,8 @@ The React components use CSS variables for theming:
 
 ### UN Fetcher
 
-- `fetchUNDocument(symbol)` - Fetch UN document by symbol
-- `extractYear(symbol)` - Extract year from symbol
+- `fetchUNDocument(symbol)` - Fetch UN document content by symbol from [ODS](https://documents.un.org)
+- `fetchDocumentMetadata(symbol)` - Fetch metadata (title, date, year) from [UN Digital Library](https://digitallibrary.un.org)
 
 ## License
 
