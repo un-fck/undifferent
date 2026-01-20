@@ -21,9 +21,10 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build:lib": "tsup",
+    "build": "tsup && next build",
     "dev": "next dev",
-    "prepare": "npm run build"
+    "prepare": "npm run build:lib"
   },
   "peerDependencies": {
     "react": ">=18"
