@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { diff } from '../../../src/core'
-import { fetchUNDocument } from '../../../src/un-fetcher'
+import { fetchUNDocument, fetchDocumentMetadata } from '../../../src/un-fetcher'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,10 +13,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch documents from UN API
-    const [docA, docB] = await Promise.all([
+    // Fetch documents and metadata from UN API
+    const [docA, docB, metaA, metaB] = await Promise.all([
       fetchUNDocument(symbolA),
       fetchUNDocument(symbolB),
+      fetchDocumentMetadata(symbolA),
+      fetchDocumentMetadata(symbolB),
     ])
 
     const result = diff(docA.lines, docB.lines)
@@ -26,6 +28,10 @@ export async function POST(request: NextRequest) {
       score: result.score,
       items: result.items,
       formats: { left: docA.format, right: docB.format },
+      metadata: {
+        left: metaA,
+        right: metaB,
+      },
     })
   } catch (error) {
     console.error('Error processing diff:', error)

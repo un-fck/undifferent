@@ -17,11 +17,18 @@ export interface UNDocumentMetadata {
   title: string
   date: string | null
   year: number | null
+  subjects: string[]
+  vote?: {
+    inFavour: number
+    against: number
+    abstaining: number
+  }
+  agendaInfo?: string
 }
 
 /**
  * Fetch document metadata from UN Digital Library
- * Returns title, date, and year for the given symbol
+ * Returns title, date, year, subjects, vote info, and agenda for the given symbol
  */
 export async function fetchDocumentMetadata(symbol: string): Promise<UNDocumentMetadata> {
   const encodedSymbol = encodeURIComponent(symbol)
@@ -43,7 +50,7 @@ export async function fetchDocumentMetadata(symbol: string): Promise<UNDocumentM
   // Split into records using regex to handle whitespace
   const recordMatches = xml.match(/<record>[\s\S]*?<\/record>/g)
   if (!recordMatches) {
-    return { symbol, title: symbol, date: null, year: null }
+    return { symbol, title: symbol, date: null, year: null, subjects: [] }
   }
   
   for (const record of recordMatches) {
@@ -78,11 +85,47 @@ export async function fetchDocumentMetadata(symbol: string): Promise<UNDocumentM
       }
     }
 
-    return { symbol, title, date, year }
+    // Extract subjects from tag 650$a (can be multiple)
+    const subjects: string[] = []
+    const tag650Matches = record.matchAll(/<datafield tag="650"[^>]*>([\s\S]*?)<\/datafield>/g)
+    for (const match of tag650Matches) {
+      const subjectMatch = match[1].match(/<subfield code="a">([^<]+)<\/subfield>/)
+      if (subjectMatch) {
+        subjects.push(subjectMatch[1].trim())
+      }
+    }
+
+    // Extract vote info from tag 996 (subfields b=in favour, c=against, d=abstaining)
+    let vote: UNDocumentMetadata['vote'] = undefined
+    const tag996Match = record.match(/<datafield tag="996"[^>]*>([\s\S]*?)<\/datafield>/)
+    if (tag996Match) {
+      const inFavourMatch = tag996Match[1].match(/<subfield code="b">(\d+)<\/subfield>/)
+      const againstMatch = tag996Match[1].match(/<subfield code="c">(\d+)<\/subfield>/)
+      const abstainingMatch = tag996Match[1].match(/<subfield code="d">(\d+)<\/subfield>/)
+      if (inFavourMatch || againstMatch || abstainingMatch) {
+        vote = {
+          inFavour: inFavourMatch ? parseInt(inFavourMatch[1]) : 0,
+          against: againstMatch ? parseInt(againstMatch[1]) : 0,
+          abstaining: abstainingMatch ? parseInt(abstainingMatch[1]) : 0,
+        }
+      }
+    }
+
+    // Extract agenda info from tag 991$d or 991$e
+    let agendaInfo: string | undefined = undefined
+    const tag991Match = record.match(/<datafield tag="991"[^>]*>([\s\S]*?)<\/datafield>/)
+    if (tag991Match) {
+      const agendaMatch = tag991Match[1].match(/<subfield code="[de]">([^<]+)<\/subfield>/)
+      if (agendaMatch) {
+        agendaInfo = agendaMatch[1].trim()
+      }
+    }
+
+    return { symbol, title, date, year, subjects, vote, agendaInfo }
   }
 
   // No exact match found, return with null values
-  return { symbol, title: symbol, date: null, year: null }
+  return { symbol, title: symbol, date: null, year: null, subjects: [] }
 }
 
 /**
